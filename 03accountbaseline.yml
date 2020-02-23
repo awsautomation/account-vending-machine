@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Baseline IAM resources for new account (fdp-1pg15ff8j)
+
+Parameters:
+  ServiceCatalogUserName:
+    Type: String
+    Description: Username for the IAM user for ServiceCatalog in the newly vended account
+  ServiceCatalogUserPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    Description: Password for the IAM user for ServiceCatalog in the newly vended account
+
+Resources:
+  ServiceCatalogUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: !Ref ServiceCatalogUserName
+      Path: /
+      LoginProfile:
+        Password: !Ref ServiceCatalogUserPassword
+        PasswordResetRequired: true
+
+  ServiceCatalogUserKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      Status: 'Active'
+      UserName: !Ref ServiceCatalogUser
+
+  ServiceCatalogUserGroup:
+    Type: 'AWS::IAM::Group'
+    Properties:
+      GroupName: ServiceCatalogUserGroup
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSServiceCatalogEndUserFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/IAMUserChangePassword"
+      Path: /
+
+  ServiceCatalogGroupPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Groups:
+        - !Ref ServiceCatalogUserGroup
+      PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  -
+                    Effect: "Allow"
+                    Action:
+                      - "cloudformation:Describe*"
+                      - "cloudformation:List*"
+                      - "cloudformation:Get*"
+                      - "ec2:CreateKeyPair"
+                    Resource: "*"
+      PolicyName: "KeyPairCreate"
+
+  AddUserToGroup:
+    Type: 'AWS::IAM::UserToGroupAddition'
+    DependsOn: ServiceCatalogUserGroup
+    Properties:
+      GroupName: !Ref ServiceCatalogUserGroup
+      Users:
+        - !Ref ServiceCatalogUser
+
+  SCEC2LaunchRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: SCEC2LaunchRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - servicecatalog.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  Cloudtrail:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "It enables Cloudtrail with Centralized Logging in S3 bucket"
+      Distributor: "Amazon"
+      Name: "Cloudtrail"
+      Owner: "IT Services"
+      SupportEmail: "support@yourcompany.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Enables Cloudtrail"
+        Name: "Cloudtrail v1.0"
+        Info:
+          LoadTemplateFromURL : https://uaex-servicecatalog-cf-templates.s3-eu-west-1.amazonaws.com/uaex-cloudtrail.json
+
+  Config:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "It enables Config Recorder with Centralized Logging in S3 bucket"
+      Distributor: "Amazon"
+      Name: "Config"
+      Owner: "IT Services"
+      SupportEmail: "support@yourcompany.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Enables Config"
+        Name: "Config v1.0"
+        Info:
+          LoadTemplateFromURL : https://uaex-servicecatalog-cf-templates.s3-eu-west-1.amazonaws.com/uaex-awsconfig.json
+
+  Guardduty:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "It enables Guardduty with finidings pushing to the security account."
+      Distributor: "Amazon"
+      Name: "Guardduty"
+      Owner: "IT Services"
+      SupportEmail: "support@yourcompany.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Enables guardduty"
+        Name: "Guardduty v1.0"
+        Info:
+          LoadTemplateFromURL : https://uaex-servicecatalog-cf-templates.s3-eu-west-1.amazonaws.com/uaex-guardduty.json
+
+  BaselinePortfolio:
+    Type: "AWS::ServiceCatalog::Portfolio"
+    Properties:
+      DisplayName: "Baseline-Portfolio"
+      AcceptLanguage: "en"
+      ProviderName: "Amazon"
+
+  ConfigAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+    Properties:
+      ProductId: !Ref Config
+      PortfolioId: !Ref BaselinePortfolio
+
+  TrailAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+    Properties:
+      ProductId: !Ref Cloudtrail
+      PortfolioId: !Ref BaselinePortfolio
+
+  GuarddutyAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+    Properties:
+      ProductId: !Ref Guardduty
+      PortfolioId: !Ref BaselinePortfolio
+
+  PortfolioPrincipalAssociationforEndUser:
+    Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
+    Properties:
+      PrincipalARN: !GetAtt ServiceCatalogUser.Arn
+      PortfolioId: !Ref BaselinePortfolio
+      PrincipalType: IAM
+
+  CloudtrailConstraint:
+    Type: AWS::ServiceCatalog::LaunchRoleConstraint
+    Properties:
+      AcceptLanguage: "en"
+      Description: "Launch Constraint for this AWS Service Catalog product"
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref Cloudtrail
+      RoleArn: !GetAtt SCEC2LaunchRole.Arn
+
+  ConfigConstraint:
+    Type: AWS::ServiceCatalog::LaunchRoleConstraint
+    Properties:
+      AcceptLanguage: "en"
+      Description: "Launch Constraint for this AWS Service Catalog product"
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref Config
+      RoleArn: !GetAtt SCEC2LaunchRole.Arn
+
+  GuraddutyConstraint:
+    Type: AWS::ServiceCatalog::LaunchRoleConstraint
+    Properties:
+      AcceptLanguage: "en"
+      Description: "Launch Constraint for this AWS Service Catalog product"
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref Guardduty
+      RoleArn: !GetAtt SCEC2LaunchRole.Arn
