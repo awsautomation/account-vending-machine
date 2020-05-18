@@ -18,6 +18,7 @@ import os
 import urllib
 import json
 from botocore.vendored import requests
+
 #from boto3 import requests
 
 '''AWS Organizations Create Account and Provision Resources via CloudFormation
@@ -86,7 +87,8 @@ def delete_default_vpc(credentials,currentregion):
         subnet_delete_response.append(ec2_client.delete_subnet(SubnetId=default_subnets[i],DryRun=False))
 
     #print("Default Subnets" + currentregion + "Deleted.")
-
+    #print("Default Subnets" + currentregion + "Deleted.")
+    
     igw_response = ec2_client.describe_internet_gateways()
     for i in range(0,len(igw_response['InternetGateways'])):
         for j in range(0,len(igw_response['InternetGateways'][i]['Attachments'])):
