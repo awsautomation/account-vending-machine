@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Baseline IAM resources for new account (fdp-1pg15ff8j)
 
+
 Parameters:
   ServiceCatalogUserName:
     Type: String
